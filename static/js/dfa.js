@@ -946,21 +946,47 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.checked) {
                 states.forEach(s => s.isStartState = false);
             }
-            
+
             selectedState.isStartState = this.checked;
             redrawCanvas();
+
+            // Save state to history
+            saveState();
         }
     });
-    
+
     isAcceptStateCheckbox.addEventListener('change', function() {
         if (selectedState) {
             selectedState.isAcceptState = this.checked;
             redrawCanvas();
+
+            // Save state to history
+            saveState();
         }
     });
-    
+
+    // Undo/Redo event listeners
+    undoBtn.addEventListener('click', performUndo);
+    redoBtn.addEventListener('click', performRedo);
+
+    // Keyboard shortcuts for undo/redo
+    document.addEventListener('keydown', function(e) {
+        // Only apply shortcuts when the canvas or drawing controls are focused
+        if (document.activeElement.closest('.draw-card') || document.activeElement === canvas) {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    performUndo();
+                } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+                    e.preventDefault();
+                    performRedo();
+                }
+            }
+        }
+    });
+
     clearCanvasBtn.addEventListener('click', clearCanvas);
-    
+
     minimizeDrawingBtn.addEventListener('click', minimizeDrawing);
     
     // Initialize canvas when the draw tab is shown
