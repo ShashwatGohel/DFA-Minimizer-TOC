@@ -732,14 +732,17 @@ document.addEventListener('DOMContentLoaded', function() {
             isAcceptState: isAcceptStateCheckbox.checked,
             selected: false
         };
-        
+
         // If this is marked as start state, unmark any existing start state
         if (state.isStartState) {
             states.forEach(s => s.isStartState = false);
         }
-        
+
         states.push(state);
         redrawCanvas();
+
+        // Save state to history
+        saveState();
     }
     
     function addTransition(fromState, toState) {
