@@ -486,6 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (historyIndex > 0) {
             historyIndex--;
             restoreState(drawingHistory[historyIndex]);
+            showNotification('Undo successful', 'info');
         }
     }
 
@@ -493,7 +494,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (historyIndex < drawingHistory.length - 1) {
             historyIndex++;
             restoreState(drawingHistory[historyIndex]);
+            showNotification('Redo successful', 'info');
         }
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        notification.style.top = '20px';
+        notification.style.left = '20px';
+        notification.style.zIndex = '9999';
+        notification.style.minWidth = '200px';
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'info' ? 'info-circle' : 'check-circle'}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove notification after 2 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 2000);
     }
     
     // Initialize canvas
