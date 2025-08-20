@@ -286,8 +286,27 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
+        // Store the minimized DFA globally for string testing
+        window.minimizedDFA = data.minimized_dfa;
+
+        // Show the string testing section
+        document.getElementById('string-test-section').style.display = 'block';
+
         // Scroll to results
         document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Function to download images
+    function downloadImage(imageUrl, filename) {
+        // Create a temporary anchor element
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = filename;
+
+        // Append to body, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
     
     // Function to generate HTML for the table-filling visualization
