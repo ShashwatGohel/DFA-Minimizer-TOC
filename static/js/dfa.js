@@ -193,10 +193,21 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayResults(data) {
         // Display the original and minimized DFAs
         resultsDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="fas fa-chart-bar"></i> Minimization Results</h4>
+                <button class="btn btn-primary download-all-btn" onclick="downloadAllImages('${data.original_image}', '${data.minimized_image}', '${data.comparison_image}')">
+                    <i class="fas fa-download"></i> Download All Images
+                </button>
+            </div>
             <div class="row">
                 <div class="col-md-6">
                     <div class="result-box original-dfa">
-                        <h5><i class="fas fa-project-diagram"></i> Original DFA</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-project-diagram"></i> Original DFA</h5>
+                            <button class="btn btn-outline-primary btn-sm download-btn" onclick="downloadImage('${data.original_image}', 'original-dfa.png')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
                         <img src="${data.original_image}" class="img-fluid" alt="Original DFA">
                         <div class="dfa-details">
                             <p><strong>States:</strong> ${data.original_dfa.states.join(', ')}</p>
@@ -208,7 +219,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="col-md-6">
                     <div class="result-box minimized-dfa">
-                        <h5><i class="fas fa-compress-arrows-alt"></i> Minimized DFA</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-compress-arrows-alt"></i> Minimized DFA</h5>
+                            <button class="btn btn-outline-success btn-sm download-btn" onclick="downloadImage('${data.minimized_image}', 'minimized-dfa.png')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
                         <img src="${data.minimized_image}" class="img-fluid" alt="Minimized DFA">
                         <div class="dfa-details">
                             <p><strong>States:</strong> ${data.minimized_dfa.states.join(', ')}</p>
@@ -224,7 +240,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Display the comparison
         processDiv.innerHTML = `
             <div class="comparison-section">
-                <h5><i class="fas fa-exchange-alt"></i> Comparison of Original and Minimized DFAs</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-exchange-alt"></i> Comparison of Original and Minimized DFAs</h5>
+                    <button class="btn btn-outline-info btn-sm download-btn" onclick="downloadImage('${data.comparison_image}', 'dfa-comparison.png')">
+                        <i class="fas fa-download"></i> Download Comparison
+                    </button>
+                </div>
                 <img src="${data.comparison_image}" class="img-fluid" alt="DFA Comparison">
                 <div class="mt-4">
                     <h5><i class="fas fa-code-branch"></i> Minimization Process</h5>
@@ -271,8 +292,61 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
+        // Store the minimized DFA globally for string testing
+        window.minimizedDFA = data.minimized_dfa;
+
+        // Show the string testing section
+        document.getElementById('string-test-section').style.display = 'block';
+
         // Scroll to results
         document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Function to download images
+    function downloadImage(imageUrl, filename) {
+        // Create a temporary anchor element
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = filename;
+
+        // Append to body, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Function to download all images
+    function downloadAllImages(originalImage, minimizedImage, comparisonImage) {
+        // Add a small delay between downloads to avoid issues
+        downloadImage(originalImage, 'original-dfa.png');
+
+        setTimeout(() => {
+            downloadImage(minimizedImage, 'minimized-dfa.png');
+        }, 500);
+
+        setTimeout(() => {
+            downloadImage(comparisonImage, 'dfa-comparison.png');
+        }, 1000);
+
+        // Show a notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.zIndex = '9999';
+        notification.innerHTML = `
+            <i class="fas fa-check-circle"></i> Downloading all DFA images...
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove notification after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
     }
     
     // Function to generate HTML for the table-filling visualization
@@ -336,6 +410,125 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedState = null;
     let transitionStart = null;
     let nextStateId = 1;
+
+    // History management for undo/redo
+    let drawingHistory = [];
+    let historyIndex = -1;
+    const maxHistorySize = 50;
+
+    // Get references to undo/redo buttons
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+
+    // History management functions
+    function saveState() {
+        // Create a deep copy of the current state
+        const currentState = {
+            states: JSON.parse(JSON.stringify(states)),
+            transitions: JSON.parse(JSON.stringify(transitions)),
+            nextStateId: nextStateId,
+            selectedState: selectedState ? { ...selectedState } : null,
+            transitionStart: transitionStart ? { ...transitionStart } : null
+        };
+
+        // Remove any states after current index (when new action is performed after undo)
+        drawingHistory = drawingHistory.slice(0, historyIndex + 1);
+
+        // Add new state to history
+        drawingHistory.push(currentState);
+
+        // Limit history size
+        if (drawingHistory.length > maxHistorySize) {
+            drawingHistory.shift();
+        } else {
+            historyIndex++;
+        }
+
+        updateHistoryButtons();
+    }
+
+    function restoreState(stateData) {
+        // Restore the drawing state
+        states = JSON.parse(JSON.stringify(stateData.states));
+        transitions = JSON.parse(JSON.stringify(stateData.transitions));
+        nextStateId = stateData.nextStateId;
+        selectedState = stateData.selectedState ? { ...stateData.selectedState } : null;
+        transitionStart = stateData.transitionStart ? { ...stateData.transitionStart } : null;
+
+        // Update UI elements
+        if (selectedState) {
+            isStartStateCheckbox.checked = selectedState.isStartState;
+            isAcceptStateCheckbox.checked = selectedState.isAcceptState;
+        } else {
+            isStartStateCheckbox.checked = false;
+            isAcceptStateCheckbox.checked = false;
+        }
+
+        // Clear transition symbol input if no transition in progress
+        if (!transitionStart) {
+            transitionSymbolInput.value = '';
+        }
+
+        // Redraw canvas
+        redrawCanvas();
+        updateHistoryButtons();
+    }
+
+    function updateHistoryButtons() {
+        // Update undo button
+        undoBtn.disabled = historyIndex <= 0;
+
+        // Update redo button
+        redoBtn.disabled = historyIndex >= drawingHistory.length - 1;
+
+        // Update status display
+        const historyStatus = document.getElementById('history-status');
+        if (historyStatus) {
+            if (drawingHistory.length > 1) {
+                historyStatus.textContent = `Step ${historyIndex + 1} of ${drawingHistory.length} | Ctrl+Z / Ctrl+Y for quick undo/redo`;
+            } else {
+                historyStatus.textContent = 'Use Ctrl+Z / Ctrl+Y for quick undo/redo';
+            }
+        }
+    }
+
+    function performUndo() {
+        if (historyIndex > 0) {
+            historyIndex--;
+            restoreState(drawingHistory[historyIndex]);
+            showNotification('Undo successful', 'info');
+        }
+    }
+
+    function performRedo() {
+        if (historyIndex < drawingHistory.length - 1) {
+            historyIndex++;
+            restoreState(drawingHistory[historyIndex]);
+            showNotification('Redo successful', 'info');
+        }
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        notification.style.top = '20px';
+        notification.style.left = '20px';
+        notification.style.zIndex = '9999';
+        notification.style.minWidth = '200px';
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'info' ? 'info-circle' : 'check-circle'}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove notification after 2 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 2000);
+    }
     
     // Initialize canvas
     function initCanvas() {
@@ -343,13 +536,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = canvas.parentElement;
         canvas.width = container.clientWidth;
         canvas.height = 500;
-        
+
         // Clear canvas
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         // Draw grid
         drawGrid();
+
+        // Save initial state
+        saveState();
     }
     
     function drawGrid() {
@@ -570,41 +766,47 @@ document.addEventListener('DOMContentLoaded', function() {
             isAcceptState: isAcceptStateCheckbox.checked,
             selected: false
         };
-        
+
         // If this is marked as start state, unmark any existing start state
         if (state.isStartState) {
             states.forEach(s => s.isStartState = false);
         }
-        
+
         states.push(state);
         redrawCanvas();
+
+        // Save state to history
+        saveState();
     }
     
     function addTransition(fromState, toState) {
         const symbol = transitionSymbolInput.value.trim();
-        
+
         if (!symbol) {
             alert('Please enter a transition symbol.');
             return false;
         }
-        
+
         // Check if transition already exists
-        const existingTransition = transitions.find(t => 
+        const existingTransition = transitions.find(t =>
             t.from === fromState.id && t.to === toState.id && t.symbol === symbol
         );
-        
+
         if (existingTransition) {
             alert(`Transition from ${fromState.label} to ${toState.label} on symbol '${symbol}' already exists.`);
             return false;
         }
-        
+
         transitions.push({
             from: fromState.id,
             to: toState.id,
             symbol: symbol
         });
-        
+
         redrawCanvas();
+
+        // Save state to history
+        saveState();
         return true;
     }
     
@@ -616,6 +818,9 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedState = null;
             transitionStart = null;
             redrawCanvas();
+
+            // Save state to history
+            saveState();
         }
     }
     
@@ -775,21 +980,47 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.checked) {
                 states.forEach(s => s.isStartState = false);
             }
-            
+
             selectedState.isStartState = this.checked;
             redrawCanvas();
+
+            // Save state to history
+            saveState();
         }
     });
-    
+
     isAcceptStateCheckbox.addEventListener('change', function() {
         if (selectedState) {
             selectedState.isAcceptState = this.checked;
             redrawCanvas();
+
+            // Save state to history
+            saveState();
         }
     });
-    
+
+    // Undo/Redo event listeners
+    undoBtn.addEventListener('click', performUndo);
+    redoBtn.addEventListener('click', performRedo);
+
+    // Keyboard shortcuts for undo/redo
+    document.addEventListener('keydown', function(e) {
+        // Only apply shortcuts when the canvas or drawing controls are focused
+        if (document.activeElement.closest('.draw-card') || document.activeElement === canvas) {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    performUndo();
+                } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+                    e.preventDefault();
+                    performRedo();
+                }
+            }
+        }
+    });
+
     clearCanvasBtn.addEventListener('click', clearCanvas);
-    
+
     minimizeDrawingBtn.addEventListener('click', minimizeDrawing);
     
     // Initialize canvas when the draw tab is shown
