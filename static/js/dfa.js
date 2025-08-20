@@ -747,29 +747,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function addTransition(fromState, toState) {
         const symbol = transitionSymbolInput.value.trim();
-        
+
         if (!symbol) {
             alert('Please enter a transition symbol.');
             return false;
         }
-        
+
         // Check if transition already exists
-        const existingTransition = transitions.find(t => 
+        const existingTransition = transitions.find(t =>
             t.from === fromState.id && t.to === toState.id && t.symbol === symbol
         );
-        
+
         if (existingTransition) {
             alert(`Transition from ${fromState.label} to ${toState.label} on symbol '${symbol}' already exists.`);
             return false;
         }
-        
+
         transitions.push({
             from: fromState.id,
             to: toState.id,
             symbol: symbol
         });
-        
+
         redrawCanvas();
+
+        // Save state to history
+        saveState();
         return true;
     }
     
