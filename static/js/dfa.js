@@ -410,6 +410,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedState = null;
     let transitionStart = null;
     let nextStateId = 1;
+
+    // History management for undo/redo
+    let drawingHistory = [];
+    let historyIndex = -1;
+    const maxHistorySize = 50;
+
+    // Get references to undo/redo buttons
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
     
     // Initialize canvas
     function initCanvas() {
