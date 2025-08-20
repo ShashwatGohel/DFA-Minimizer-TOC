@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFA Minimization Tool</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="main-container">
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="#"><i class="fas fa-project-diagram"></i> DFA Minimization Tool</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#input-section">Input</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#draw-section">Draw DFA</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#results-section">Results</a>
+                        </li>
+                        <!-- Add this to the navbar, inside the navbar-nav ul, after the existing nav items -->
+                        <li class="nav-item ms-3">
+                            <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">
+                                <i class="fas fa-moon"></i>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="intro-section text-center mb-5">
+                <h1>DFA Minimization Tool</h1>
+                <p class="lead">Minimize Deterministic Finite Automata using the Table-Filling Algorithm</p>
+            </div>
+            
+            <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-input" type="button" role="tab">Form Input</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="draw-tab" data-bs-toggle="tab" data-bs-target="#draw-input" type="button" role="tab">Draw DFA</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="myTabContent">
+                <!-- Form Input Tab -->
+                <div class="tab-pane fade show active" id="form-input" role="tabpanel">
+                    <div class="row" id="input-section">
+                        <div class="col-md-12">
+                            <div class="card input-card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-keyboard"></i> Input DFA</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="dfa-form">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <!-- States Input -->
+                                                <div class="mb-3">
+                                                    <label for="states" class="form-label">States (comma-separated):</label>
+                                                    <input type="text" class="form-control" id="states" placeholder="q0, q1, q2, ...">
+                                                </div>
+                                                
+                                                <!-- Alphabet Input -->
+                                                <div class="mb-3">
+                                                    <label for="alphabet" class="form-label">Alphabet (comma-separated):</label>
+                                                    <input type="text" class="form-control" id="alphabet" placeholder="0, 1, a, b, ...">
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-md-6">
+                                                <!-- Start State Input -->
+                                                <div class="mb-3">
+                                                    <label for="start-state" class="form-label">Start State:</label>
+                                                    <input type="text" class="form-control" id="start-state" placeholder="q0">
+                                                </div>
+                                                
+                                                <!-- Accept States Input -->
+                                                <div class="mb-3">
+                                                    <label for="accept-states" class="form-label">Accept States (comma-separated):</label>
+                                                    <input type="text" class="form-control" id="accept-states" placeholder="q1, q2, ...">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Transitions Table -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Transitions:</label>
+                                            <div id="transitions-container">
+                                                <table class="table table-bordered" id="transitions-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>State</th>
+                                                            <!-- Alphabet headers will be added dynamically -->
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Transition rows will be added dynamically -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between">
+                                            <button type="button" class="btn btn-primary" id="generate-transitions">
+                                                <i class="fas fa-table"></i> Generate Transitions Table
+                                            </button>
+                                            <button type="submit" class="btn btn-success" id="minimize-btn">
+                                                <i class="fas fa-compress-arrows-alt"></i> Minimize DFA
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Draw Input Tab -->
+                <div class="tab-pane fade" id="draw-input" role="tabpanel">
+                    <div class="row" id="draw-section">
+                        <div class="col-md-12">
+                            <div class="card draw-card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-pencil-alt"></i> Draw Your DFA</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-8">
+                                            <div class="canvas-container">
+                                                <canvas id="dfa-canvas" width="800" height="500"></canvas>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="drawing-controls">
+                                                <h5>Drawing Controls</h5>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Mode:</label>
+                                                    <div class="btn-group w-100" role="group">
+                                                        <button type="button" class="btn btn-outline-primary active" id="add-state-btn">
+                                                            <i class="fas fa-circle"></i> Add State
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-primary" id="add-transition-btn">
+                                                            <i class="fas fa-arrow-right"></i> Add Transition
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <label class="form-label">State Properties:</label>
+                                                    <div class="form-check mb-2">
+                                                        <input class="form-check-input" type="checkbox" id="is-start-state">
+                                                        <label class="form-check-label" for="is-start-state">Start State</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="is-accept-state">
+                                                        <label class="form-check-label" for="is-accept-state">Accept State</label>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3" id="transition-properties" style="display: none;">
+                                                    <label class="form-label">Transition Symbol:</label>
+                                                    <input type="text" class="form-control" id="transition-symbol" placeholder="Symbol (e.g., 0, 1, a)">
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <button type="button" class="btn btn-danger w-100" id="clear-canvas-btn">
+                                                        <i class="fas fa-trash"></i> Clear Canvas
+                                                    </button>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <button type="button" class="btn btn-success w-100" id="minimize-drawing-btn">
+                                                        <i class="fas fa-compress-arrows-alt"></i> Minimize DFA
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4" id="results-section">
+                <div class="col-12">
+                    <div class="card result-card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-bar"></i> Results</h5>
+                        </div>
+                        <div class="card-body" id="results">
+                            <p class="text-center text-muted">Enter a DFA and click "Minimize DFA" to see the results.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add this after the results section -->
+            <div class="row mt-4" id="string-test-section" style="display: none;">
+                <div class="col-12">
+                    <div class="card test-card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-check-circle"></i> Test String</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="test-string" class="form-label">Enter a string to test:</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="test-string" placeholder="e.g., 01101">
+                                            <button class="btn btn-primary" id="test-string-btn">
+                                                <i class="fas fa-play"></i> Test
+                                            </button>
+                                        </div>
+                                        <div class="form-text">Test if the minimized DFA accepts or rejects this string.</div>
+                                    </div>
+                                    <div id="test-result" class="mt-3"></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div id="visualization-container" class="text-center">
+                                        <p class="text-muted">3D visualization will appear here</p>
+                                        <div id="threejs-container" style="height: 300px; width: 100%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add Three.js library before your dfa.js script -->
+            <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card process-card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-code-branch"></i> Minimization Process</h5>
+                        </div>
+                        <div class="card-body" id="process">
+                            <p class="text-center text-muted">The minimization process will be shown here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="footer mt-5">
+            <div class="container text-center">
+                <p>DFA Minimization Tool &copy; 2023</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dfa.js') }}"></script>
+</body>
+</html>
