@@ -784,6 +784,9 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedState = null;
             transitionStart = null;
             redrawCanvas();
+
+            // Save state to history
+            saveState();
         }
     }
     
