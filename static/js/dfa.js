@@ -502,13 +502,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = canvas.parentElement;
         canvas.width = container.clientWidth;
         canvas.height = 500;
-        
+
         // Clear canvas
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         // Draw grid
         drawGrid();
+
+        // Save initial state
+        saveState();
     }
     
     function drawGrid() {
