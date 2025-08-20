@@ -196,7 +196,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="row">
                 <div class="col-md-6">
                     <div class="result-box original-dfa">
-                        <h5><i class="fas fa-project-diagram"></i> Original DFA</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-project-diagram"></i> Original DFA</h5>
+                            <button class="btn btn-outline-primary btn-sm download-btn" onclick="downloadImage('${data.original_image}', 'original-dfa.png')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
                         <img src="${data.original_image}" class="img-fluid" alt="Original DFA">
                         <div class="dfa-details">
                             <p><strong>States:</strong> ${data.original_dfa.states.join(', ')}</p>
@@ -208,7 +213,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="col-md-6">
                     <div class="result-box minimized-dfa">
-                        <h5><i class="fas fa-compress-arrows-alt"></i> Minimized DFA</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-compress-arrows-alt"></i> Minimized DFA</h5>
+                            <button class="btn btn-outline-success btn-sm download-btn" onclick="downloadImage('${data.minimized_image}', 'minimized-dfa.png')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
                         <img src="${data.minimized_image}" class="img-fluid" alt="Minimized DFA">
                         <div class="dfa-details">
                             <p><strong>States:</strong> ${data.minimized_dfa.states.join(', ')}</p>
