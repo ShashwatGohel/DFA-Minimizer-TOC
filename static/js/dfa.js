@@ -234,7 +234,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Display the comparison
         processDiv.innerHTML = `
             <div class="comparison-section">
-                <h5><i class="fas fa-exchange-alt"></i> Comparison of Original and Minimized DFAs</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-exchange-alt"></i> Comparison of Original and Minimized DFAs</h5>
+                    <button class="btn btn-outline-info btn-sm download-btn" onclick="downloadImage('${data.comparison_image}', 'dfa-comparison.png')">
+                        <i class="fas fa-download"></i> Download Comparison
+                    </button>
+                </div>
                 <img src="${data.comparison_image}" class="img-fluid" alt="DFA Comparison">
                 <div class="mt-4">
                     <h5><i class="fas fa-code-branch"></i> Minimization Process</h5>
