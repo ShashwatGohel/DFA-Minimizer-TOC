@@ -480,6 +480,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Update redo button
         redoBtn.disabled = historyIndex >= drawingHistory.length - 1;
+
+        // Update status display
+        const historyStatus = document.getElementById('history-status');
+        if (historyStatus) {
+            if (drawingHistory.length > 1) {
+                historyStatus.textContent = `Step ${historyIndex + 1} of ${drawingHistory.length} | Ctrl+Z / Ctrl+Y for quick undo/redo`;
+            } else {
+                historyStatus.textContent = 'Use Ctrl+Z / Ctrl+Y for quick undo/redo';
+            }
+        }
     }
 
     function performUndo() {
