@@ -485,6 +485,20 @@ body {
     margin-right: 0.5rem;
 }
 
+.download-all-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    color: white;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+}
+
+.download-all-btn:hover {
+    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
 /* Result box styling */
 .result-box {
     background: var(--dark-surface);
