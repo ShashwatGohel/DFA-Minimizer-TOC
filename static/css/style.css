@@ -405,6 +405,27 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+.btn-outline-secondary {
+    color: var(--dark-text-secondary);
+    border: 2px solid var(--dark-border);
+    background: transparent;
+    transition: all var(--transition-fast);
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+    background-color: var(--dark-text-secondary);
+    border-color: var(--dark-text-secondary);
+    color: var(--dark-bg);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-outline-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn i {
     margin-right: 0.5rem;
 }
