@@ -167,15 +167,30 @@
                                                 </div>
                                                 
                                                 <div class="mb-3" id="transition-properties" style="display: none;">
-                                                    <label class="form-label">Transition Symbol:</label>
-                                                    <input type="text" class="form-control" id="transition-symbol" placeholder="Symbol (e.g., 0, 1, a)">
-                                                </div>
-                                                
-                                                <div class="mb-3">
-                                                    <button type="button" class="btn btn-danger w-100" id="clear-canvas-btn">
-                                                        <i class="fas fa-trash"></i> Clear Canvas
-                                                    </button>
-                                                </div>
+    <label class="form-label">Transition Symbol:</label>
+    <input type="text" class="form-control" id="transition-symbol" placeholder="Symbol (e.g., 0, 1, a)">
+</div>
+
+<div class="mb-3">
+    <label class="form-label">History:</label>
+    <div class="btn-group w-100" role="group">
+        <button type="button" class="btn btn-outline-secondary" id="undo-btn" disabled>
+            <i class="fas fa-undo"></i> Undo
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="redo-btn" disabled>
+            <i class="fas fa-redo"></i> Redo
+        </button>
+    </div>
+    <small class="text-muted mt-1 d-block" id="history-status">
+        Use Ctrl+Z / Ctrl+Y for quick undo/redo
+    </small>
+</div>
+
+<div class="mb-3">
+    <button type="button" class="btn btn-danger w-100" id="clear-canvas-btn">
+        <i class="fas fa-trash"></i> Clear Canvas
+    </button>
+</div>
                                                 
                                                 <div class="mb-3">
                                                     <button type="button" class="btn btn-success w-100" id="minimize-drawing-btn">
