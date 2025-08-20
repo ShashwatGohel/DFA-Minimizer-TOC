@@ -419,6 +419,82 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get references to undo/redo buttons
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
+
+    // History management functions
+    function saveState() {
+        // Create a deep copy of the current state
+        const currentState = {
+            states: JSON.parse(JSON.stringify(states)),
+            transitions: JSON.parse(JSON.stringify(transitions)),
+            nextStateId: nextStateId,
+            selectedState: selectedState ? { ...selectedState } : null,
+            transitionStart: transitionStart ? { ...transitionStart } : null
+        };
+
+        // Remove any states after current index (when new action is performed after undo)
+        drawingHistory = drawingHistory.slice(0, historyIndex + 1);
+
+        // Add new state to history
+        drawingHistory.push(currentState);
+
+        // Limit history size
+        if (drawingHistory.length > maxHistorySize) {
+            drawingHistory.shift();
+        } else {
+            historyIndex++;
+        }
+
+        updateHistoryButtons();
+    }
+
+    function restoreState(stateData) {
+        // Restore the drawing state
+        states = JSON.parse(JSON.stringify(stateData.states));
+        transitions = JSON.parse(JSON.stringify(stateData.transitions));
+        nextStateId = stateData.nextStateId;
+        selectedState = stateData.selectedState ? { ...stateData.selectedState } : null;
+        transitionStart = stateData.transitionStart ? { ...stateData.transitionStart } : null;
+
+        // Update UI elements
+        if (selectedState) {
+            isStartStateCheckbox.checked = selectedState.isStartState;
+            isAcceptStateCheckbox.checked = selectedState.isAcceptState;
+        } else {
+            isStartStateCheckbox.checked = false;
+            isAcceptStateCheckbox.checked = false;
+        }
+
+        // Clear transition symbol input if no transition in progress
+        if (!transitionStart) {
+            transitionSymbolInput.value = '';
+        }
+
+        // Redraw canvas
+        redrawCanvas();
+        updateHistoryButtons();
+    }
+
+    function updateHistoryButtons() {
+        // Update undo button
+        undoBtn.disabled = historyIndex <= 0;
+
+        // Update redo button
+        redoBtn.disabled = historyIndex >= drawingHistory.length - 1;
+    }
+
+    function performUndo() {
+        if (historyIndex > 0) {
+            historyIndex--;
+            restoreState(drawingHistory[historyIndex]);
+        }
+    }
+
+    function performRedo() {
+        if (historyIndex < drawingHistory.length - 1) {
+            historyIndex++;
+            restoreState(drawingHistory[historyIndex]);
+        }
+    }
     
     // Initialize canvas
     function initCanvas() {
