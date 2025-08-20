@@ -1,4 +1,4 @@
-    /* Modern, dark mode styles for the DFA Minimization Tool */
+/* Modern, dark mode styles for the DFA Minimization Tool */
 
 :root {
     /* Dark mode color palette */
@@ -142,6 +142,8 @@ body {
 /* Intro section with animated gradient text */
 .intro-section {
     padding: 4rem 0 3rem;
+    width: 100%;
+    color: rgba(255, 255, 255, 1);
 }
 
 .intro-section h1 {
