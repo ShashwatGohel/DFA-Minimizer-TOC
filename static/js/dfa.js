@@ -314,6 +314,40 @@ document.addEventListener('DOMContentLoaded', function() {
         link.click();
         document.body.removeChild(link);
     }
+
+    // Function to download all images
+    function downloadAllImages(originalImage, minimizedImage, comparisonImage) {
+        // Add a small delay between downloads to avoid issues
+        downloadImage(originalImage, 'original-dfa.png');
+
+        setTimeout(() => {
+            downloadImage(minimizedImage, 'minimized-dfa.png');
+        }, 500);
+
+        setTimeout(() => {
+            downloadImage(comparisonImage, 'dfa-comparison.png');
+        }, 1000);
+
+        // Show a notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.zIndex = '9999';
+        notification.innerHTML = `
+            <i class="fas fa-check-circle"></i> Downloading all DFA images...
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove notification after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
     
     // Function to generate HTML for the table-filling visualization
     function generateTableFillingHTML(tableData) {
