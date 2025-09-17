@@ -587,6 +587,14 @@ body {
     text-align: center;
     transition: all var(--transition-fast);
 }
+
+.table-filling td.clickable {
+    cursor: pointer;
+}
+
+.table-filling td.clickable:hover {
+    filter: brightness(1.1);
+}
     
 .table-filling th {
     background: linear-gradient(to right, var(--primary-dark), var(--primary-color));

@@ -29,6 +29,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const minimizeBtn = document.getElementById('minimize-btn');
     const resultsDiv = document.getElementById('results');
     const processDiv = document.getElementById('process');
+
+    // NFA elements
+    const nfaStatesInput = document.getElementById('nfa-states');
+    const nfaAlphabetInput = document.getElementById('nfa-alphabet');
+    const nfaStartStateInput = document.getElementById('nfa-start-state');
+    const nfaAcceptStatesInput = document.getElementById('nfa-accept-states');
+    const nfaEpsilonCheckbox = document.getElementById('nfa-has-epsilon');
+    const nfaTransitionsTable = document.getElementById('nfa-transitions-table');
+    const generateNfaTransitionsBtn = document.getElementById('generate-nfa-transitions');
+
+    if (generateNfaTransitionsBtn) {
+        generateNfaTransitionsBtn.addEventListener('click', function() {
+            generateNFATransitionsTable();
+        });
+    }
+
+    const nfaForm = document.getElementById('nfa-form');
+    if (nfaForm) {
+        nfaForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            convertNFA();
+        });
+    }
     
     // Generate transitions table when button is clicked
     generateTransitionsBtn.addEventListener('click', function() {
@@ -186,9 +209,208 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> An error occurred while minimizing the DFA.</div>`;
         });
     }
-    
+
     // Add these functions to your existing dfa.js file
-    
+
+    function generateNFATransitionsTable() {
+        const states = (nfaStatesInput?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        const alphabet = (nfaAlphabetInput?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        const includeEps = !!nfaEpsilonCheckbox?.checked;
+
+        if (includeEps && !alphabet.includes('ε')) alphabet.push('ε');
+
+        if (!nfaTransitionsTable) return;
+        if (states.length === 0 || alphabet.length === 0) {
+            alert('Please enter at least one state and one symbol in the alphabet.');
+            return;
+        }
+
+        const thead = nfaTransitionsTable.querySelector('thead tr');
+        const tbody = nfaTransitionsTable.querySelector('tbody');
+        // Clear headers except first
+        while (thead.children.length > 1) thead.removeChild(thead.lastChild);
+        // Clear body
+        tbody.innerHTML = '';
+
+        for (const symbol of alphabet) {
+            const th = document.createElement('th');
+            th.textContent = symbol;
+            thead.appendChild(th);
+        }
+
+        for (const state of states) {
+            const tr = document.createElement('tr');
+            const stateTd = document.createElement('td');
+            stateTd.textContent = state;
+            tr.appendChild(stateTd);
+            for (const symbol of alphabet) {
+                const td = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-control nfa-transition-input';
+                input.dataset.from = state;
+                input.dataset.symbol = symbol;
+                input.placeholder = 'Targets (q1,q2)';
+                td.appendChild(input);
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+    }
+
+    function convertNFA() {
+        const states = (nfaStatesInput?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        const alphabet = (nfaAlphabetInput?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        const includeEps = !!nfaEpsilonCheckbox?.checked;
+        if (includeEps && !alphabet.includes('ε')) alphabet.push('ε');
+        const startState = (nfaStartStateInput?.value || '').trim();
+        const acceptStates = (nfaAcceptStatesInput?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        if (states.length === 0 || alphabet.length === 0 || !startState || acceptStates.length === 0) {
+            alert('Please fill in all required fields.');
+            return;
+        }
+        if (!states.includes(startState)) {
+            alert('Start state must be one of the states.');
+            return;
+        }
+        for (const a of acceptStates) {
+            if (!states.includes(a)) {
+                alert(`Accept state ${a} is not in the list of states.`);
+                return;
+            }
+        }
+
+        const transitions = {};
+        const inputs = document.querySelectorAll('.nfa-transition-input');
+        for (const input of inputs) {
+            const from = input.dataset.from;
+            const symbol = input.dataset.symbol;
+            const val = (input.value || '').trim();
+            if (!val) continue; // NFAs can have missing transitions
+            const targets = val.split(',').map(s => s.trim()).filter(Boolean);
+            for (const t of targets) {
+                if (!states.includes(t)) {
+                    alert(`Transition from ${from} on ${symbol} goes to ${t}, which is not in the list of states.`);
+                    return;
+                }
+            }
+            if (!transitions[from]) transitions[from] = {};
+            transitions[from][symbol] = targets;
+        }
+
+        const nfa = {
+            states: states,
+            alphabet: alphabet,
+            transitions: transitions,
+            start_state: startState,
+            accept_states: acceptStates
+        };
+        sendNFAForConversion(nfa);
+    }
+
+    function sendNFAForConversion(nfa) {
+        resultsDiv.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2">Converting NFA...</p></div>';
+        processDiv.innerHTML = '';
+        fetch('/convert_nfa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(nfa)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                displayNFAConversion(data);
+            } else {
+                resultsDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Error: ${data.error}</div>`;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            resultsDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> An error occurred while converting the NFA.</div>`;
+        });
+    }
+
+    function displayNFAConversion(data) {
+        window.convertedDFA = data.dfa;
+        window.minimizedDFA = data.dfa; // allow immediate testing
+        document.getElementById('string-test-section').style.display = 'block';
+
+        resultsDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> NFA → DFA Conversion</h4>
+                <button class="btn btn-success" onclick='sendDFAForMinimization(window.convertedDFA)'>
+                    <i class="fas fa-compress-arrows-alt"></i> Minimize Converted DFA
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="result-box original-dfa">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-project-diagram"></i> Original NFA</h5>
+                            <button class="btn btn-outline-primary btn-sm download-btn" onclick="downloadImage('${data.nfa_image}', 'original-nfa.svg')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                        <img src="${data.nfa_image}" class="img-fluid" alt="Original NFA">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="result-box minimized-dfa">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-diagram-project"></i> Converted DFA</h5>
+                            <button class="btn btn-outline-success btn-sm download-btn" onclick="downloadImage('${data.dfa_image}', 'converted-dfa.svg')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                        <img src="${data.dfa_image}" class="img-fluid" alt="Converted DFA">
+                        <div class="dfa-details">
+                            <p><strong>DFA States:</strong> ${data.dfa.states.join(', ')}</p>
+                            <p><strong>Alphabet:</strong> ${data.dfa.alphabet.join(', ')}</p>
+                            <p><strong>Start State:</strong> ${data.dfa.start_state}</p>
+                            <p><strong>Accept States:</strong> ${data.dfa.accept_states.join(', ')}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        processDiv.innerHTML = `
+            <div class="stats-section">
+                <div class="row text-center">
+                    <div class="col-md-6">
+                        <div class="stat-card">
+                            <h3>${data.nfa.states.length}</h3>
+                            <p>NFA States</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-card">
+                            <h3>${data.dfa.states.length}</h3>
+                            <p>DFA States</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <h5><i class="fas fa-italic"></i> Regular Expression (Arden's Theorem)</h5>
+                <button class="btn btn-outline-warning btn-sm" id="compute-regex-btn">
+                    <i class="fas fa-magic"></i> Compute Regex
+                </button>
+                <div id="regex-result" class="mt-3"></div>
+            </div>`;
+
+        const computeBtn = document.getElementById('compute-regex-btn');
+        if (computeBtn) {
+            computeBtn.addEventListener('click', () => {
+                const dfa = data.dfa;
+                requestDFARegex(dfa);
+            });
+        }
+
+        document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
     // After displayResults function, add:
     function displayResults(data) {
         // Display the original and minimized DFAs
@@ -236,7 +458,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         `;
-        
+
+        // Add Regex section hook
+        processDiv.innerHTML = '';
+
         // Display the comparison
         processDiv.innerHTML = `
             <div class="comparison-section">
@@ -290,16 +515,86 @@ document.addEventListener('DOMContentLoaded', function() {
                     ${generateTableFillingHTML(data.table_filling_data)}
                 </div>
             </div>
+
+            <div class="table-filling-section mt-4">
+                <h5><i class="fas fa-th"></i> Lower Triangular Block Table (Interactive)</h5>
+                <p>Click cells to mark/unmark pairs. Use controls to auto-mark using transitions.</p>
+                <div class="step-controls">
+                    <button class="step-btn" id="block-auto-step"><i class="fas fa-step-forward"></i> Auto Step</button>
+                    <button class="step-btn" id="block-auto-complete"><i class="fas fa-forward"></i> Auto Complete</button>
+                    <button class="step-btn" id="block-reset"><i class="fas fa-undo-alt"></i> Reset</button>
+                </div>
+                <div class="table-responsive" id="block-table-container"></div>
+                <div class="equivalence-classes" id="block-mergeable"></div>
+            </div>
+
+            <div class="mt-4">
+                <h5><i class="fas fa-italic"></i> Regular Expression (Arden's Theorem)</h5>
+                <button class="btn btn-outline-warning btn-sm" id="compute-regex-btn">
+                    <i class="fas fa-magic"></i> Compute Regex
+                </button>
+                <div id="regex-result" class="mt-3"></div>
+            </div>
         `;
-        
+
         // Store the minimized DFA globally for string testing
         window.minimizedDFA = data.minimized_dfa;
+
+        // Initialize interactive block table using original DFA
+        setupInteractiveBlockTable(data.original_dfa);
+
+        // Hook up regex computation
+        const computeBtn = document.getElementById('compute-regex-btn');
+        if (computeBtn) {
+            computeBtn.addEventListener('click', () => {
+                const dfa = window.minimizedDFA || window.convertedDFA;
+                if (!dfa) {
+                    alert('No DFA available.');
+                    return;
+                }
+                requestDFARegex(dfa);
+            });
+        }
 
         // Show the string testing section
         document.getElementById('string-test-section').style.display = 'block';
 
         // Scroll to results
         document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function requestDFARegex(dfa) {
+        const container = document.getElementById('regex-result');
+        if (container) {
+            container.innerHTML = '<div class="text-center"><div class="spinner-border text-warning" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2">Computing regular expression...</p></div>';
+        }
+        fetch('/dfa_to_regex', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dfa })
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                renderRegexResult(data);
+            } else {
+                if (container) container.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> ${data.error}</div>`;
+            }
+        }).catch(err => {
+            console.error(err);
+            if (container) container.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Error computing regex.</div>`;
+        });
+    }
+
+    function renderRegexResult(data) {
+        const container = document.getElementById('regex-result');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0"><i class="fas fa-spell-check"></i> Regular Expression</h5></div>
+                <div class="card-body">
+                    <div class="alert alert-info"><strong>Regex:</strong> <code>${data.regex}</code></div>
+                </div>
+            </div>
+        `;
     }
 
     // Function to download images
@@ -390,7 +685,112 @@ document.addEventListener('DOMContentLoaded', function() {
         html += '</table>';
         return html;
     }
-    
+
+    // Interactive block table logic
+    function buildBlockTableData(dfa) {
+        const states = [...dfa.states];
+        states.sort();
+        const n = states.length;
+        const marked = Array.from({ length: n - 1 }, () => []);
+        for (let i = 0; i < n - 1; i++) {
+            for (let j = i + 1; j < n; j++) {
+                const a = states[i];
+                const b = states[j];
+                const isDist = (dfa.accept_states.includes(a)) !== (dfa.accept_states.includes(b));
+                marked[i][j - (i + 1)] = { marked: isDist, reason: isDist ? 'accept vs non-accept' : '' };
+            }
+        }
+        return { states, marked };
+    }
+
+    function renderBlockTable(containerId, data) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const states = data.states;
+        const n = states.length;
+        let html = '<table class="table-filling">';
+        html += '<tr><th></th>';
+        for (let j = 1; j < n; j++) html += `<th>${states[j]}</th>`;
+        html += '</tr>';
+        for (let i = 0; i < n - 1; i++) {
+            html += `<tr><th>${states[i]}</th>`;
+            for (let k = 0; k < i; k++) html += '<td></td>';
+            for (let j = i + 1; j < n; j++) {
+                const cell = data.marked[i][j - (i + 1)];
+                const cls = cell.marked ? 'distinguishable' : 'indistinguishable';
+                html += `<td class="${cls} clickable" data-i="${i}" data-j="${j}">${cell.marked ? 'X' : ''}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</table>';
+        container.innerHTML = html;
+        container.querySelectorAll('td.clickable').forEach(td => {
+            td.addEventListener('click', () => {
+                const i = parseInt(td.getAttribute('data-i'), 10);
+                const j = parseInt(td.getAttribute('data-j'), 10);
+                const cell = data.marked[i][j - (i + 1)];
+                cell.marked = !cell.marked;
+                renderBlockTable(containerId, data);
+            });
+        });
+    }
+
+    function autoStepBlockTable(data, dfa) {
+        const states = data.states;
+        const n = states.length;
+        const alphabet = [...dfa.alphabet];
+        for (let i = 0; i < n - 1; i++) {
+            for (let j = i + 1; j < n; j++) {
+                const cell = data.marked[i][j - (i + 1)];
+                if (cell.marked) continue;
+                for (const sym of alphabet) {
+                    const a = states[i];
+                    const b = states[j];
+                    const an = dfa.transitions[a][sym];
+                    const bn = dfa.transitions[b][sym];
+                    if (an === bn) continue;
+                    const ia = states.indexOf(an);
+                    const ib = states.indexOf(bn);
+                    const lowI = Math.min(ia, ib);
+                    const highJ = Math.max(ia, ib);
+                    const dep = data.marked[lowI][highJ - (lowI + 1)];
+                    if (dep && dep.marked) {
+                        cell.marked = true;
+                        cell.reason = `via '${sym}' to (${an}, ${bn})`;
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    function autoCompleteBlockTable(data, dfa) {
+        while (autoStepBlockTable(data, dfa)) {}
+    }
+
+    function setupInteractiveBlockTable(originalDFA) {
+        const data = buildBlockTableData(originalDFA);
+        renderBlockTable('block-table-container', data);
+        const stepBtn = document.getElementById('block-auto-step');
+        const fullBtn = document.getElementById('block-auto-complete');
+        const resetBtn = document.getElementById('block-reset');
+        stepBtn?.addEventListener('click', () => {
+            autoStepBlockTable(data, originalDFA);
+            renderBlockTable('block-table-container', data);
+        });
+        fullBtn?.addEventListener('click', () => {
+            autoCompleteBlockTable(data, originalDFA);
+            renderBlockTable('block-table-container', data);
+        });
+        resetBtn?.addEventListener('click', () => {
+            const fresh = buildBlockTableData(originalDFA);
+            renderBlockTable('block-table-container', fresh);
+            data.states = fresh.states;
+            data.marked = fresh.marked;
+        });
+    }
+
     // Canvas-based DFA drawing functionality
     const canvas = document.getElementById('dfa-canvas');
     const ctx = canvas.getContext('2d');

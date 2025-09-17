@@ -3,18 +3,19 @@ from dfa import DFA
 def minimize_dfa_table_filling(dfa):
     """
     Minimize a DFA using the Table-Filling Algorithm (Myhill-Nerode Algorithm).
+    Returns a tuple: (minimized_dfa, table_filling_data)
     """
     # First, remove unreachable states
     dfa = dfa.remove_unreachable_states()
-    
+
     # If there's only one state, the DFA is already minimal
     if len(dfa.states) <= 1:
-        return dfa
-    
+        return dfa, generate_table_filling_data(dfa, {})
+
     # Initialize the distinguishability table
     # distinguishable[(p, q)] = True if states p and q are distinguishable
     distinguishable = {}
-    
+
     # Initialize all pairs as indistinguishable
     states_list = list(dfa.states)
     for i in range(len(states_list)):
@@ -22,14 +23,14 @@ def minimize_dfa_table_filling(dfa):
             p, q = states_list[i], states_list[j]
             distinguishable[(p, q)] = False
             distinguishable[(q, p)] = False
-    
+
     # Mark pairs where one state is accepting and the other is not
     for p in dfa.states:
         for q in dfa.states:
             if p != q:
                 if (p in dfa.accept_states) != (q in dfa.accept_states):
                     distinguishable[(p, q)] = True
-    
+
     # Iteratively mark more pairs as distinguishable
     changed = True
     while changed:
@@ -45,7 +46,7 @@ def minimize_dfa_table_filling(dfa):
                             distinguishable[(q, p)] = True
                             changed = True
                             break
-    
+
     # Create equivalence classes based on indistinguishable states
     equivalence_classes = {}
     for state in dfa.states:
@@ -57,18 +58,18 @@ def minimize_dfa_table_filling(dfa):
                 break
         if not found:
             equivalence_classes[state] = {state}
-    
+
     # Create the minimized DFA
     new_states = set(equivalence_classes.keys())
     new_accept_states = {state for state in new_states if state in dfa.accept_states}
-    
+
     # Find the new start state
     new_start_state = None
     for representative, eq_class in equivalence_classes.items():
         if dfa.start_state in eq_class:
             new_start_state = representative
             break
-    
+
     # Create new transitions
     new_transitions = {}
     for representative in new_states:
@@ -78,11 +79,12 @@ def minimize_dfa_table_filling(dfa):
                 if original_next in eq_class:
                     new_transitions[(representative, symbol)] = new_state
                     break
-    
+
     # Generate the table filling visualization data
     table_data = generate_table_filling_data(dfa, distinguishable)
-    
-    return DFA(new_states, dfa.alphabet, new_transitions, new_start_state, new_accept_states)
+
+    minimized = DFA(new_states, dfa.alphabet, new_transitions, new_start_state, new_accept_states)
+    return minimized, table_data
 
 def generate_table_filling_data(dfa, distinguishable):
     """
