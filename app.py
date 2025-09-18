@@ -426,11 +426,21 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 def run_server():
-    port = int(os.environ.get('PORT', '5000'))
-    addr = ('0.0.0.0', port)
-    httpd = HTTPServer(addr, AppHandler)
-    print(f'Serving on http://{addr[0]}:{addr[1]}')
-    httpd.serve_forever()
+    # Bind to all available network interfaces
+    addr = ("0.0.0.0", 5000)
+
+    try:
+        httpd = HTTPServer(addr, AppHandler)
+        print(f"Serving on http://{addr[0]}:{addr[1]}")
+        httpd.serve_forever()
+    except OSError as e:
+        print(f"Port {addr[1]} is busy, trying another port...")
+        # fallback to a different port
+        fallback_addr = ("0.0.0.0", 8501)
+        httpd = HTTPServer(fallback_addr, AppHandler)
+        print(f"Serving on http://{fallback_addr[0]}:{fallback_addr[1]}")
+        httpd.serve_forever()
+
 
 
 if __name__ == '__main__':
