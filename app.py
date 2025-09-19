@@ -41,7 +41,6 @@ def _data_url(svg: str) -> str:
 
 
 def _layout_states(states: List[str], width: int, height: int) -> Dict[str, Tuple[float, float]]:
-    # Place states evenly on a circle
     import math
     n = max(1, len(states))
     cx, cy = width * 0.5, height * 0.55
@@ -58,14 +57,30 @@ def _layout_states(states: List[str], width: int, height: int) -> Dict[str, Tupl
 def _arrow_marker_defs() -> str:
     return (
         '<defs>'
-        '  <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
+        '  <filter id="nodeShadow" x="-50%" y="-50%" width="200%" height="200%">'
+        '    <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.35"/>'
+        '  </filter>'
+        '  <filter id="labelShadow" x="-50%" y="-50%" width="200%" height="200%">'
+        '    <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.35"/>'
+        '  </filter>'
+        '  <marker id="arrow-blue" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
         '    <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a6fa5"></path>'
         '  </marker>'
-        '  <marker id="arrow-red" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
+        '  <marker id="arrow-green" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+        '    <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981"></path>'
+        '  </marker>'
+        '  <marker id="arrow-red" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
         '    <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff0000"></path>'
         '  </marker>'
         '</defs>'
     )
+
+
+def _group_edge_labels(transitions: Dict[Tuple[str, str], str]) -> Dict[Tuple[str, str], List[str]]:
+    edge_labels: Dict[Tuple[str, str], List[str]] = {}
+    for (u, a), v in transitions.items():
+        edge_labels.setdefault((u, v), []).append(str(a))
+    return edge_labels
 
 
 def generate_dfa_svg(dfa: DFA, title: str = '') -> str:
@@ -74,55 +89,129 @@ def generate_dfa_svg(dfa: DFA, title: str = '') -> str:
     start = dfa.start_state
     accept = set(dfa.accept_states)
 
+    edge_labels = _group_edge_labels(dfa.transitions)
+    bidir = set()
+    for (u, v) in list(edge_labels.keys()):
+        if (v, u) in edge_labels and u != v:
+            bidir.add((u, v))
+            bidir.add((v, u))
+
+    # Styling
+    title_lower = (title or '').lower()
+    stroke_color = '#10b981' if 'minimized' in title_lower else '#4a6fa5'
+    marker_id = 'arrow-green' if 'minimized' in title_lower else 'arrow-blue'
+
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">']
     svg.append(_arrow_marker_defs())
-
     if title:
         svg.append(f'<text x="20" y="40" fill="#e0e0e0" font-size="22" font-family="Arial" font-weight="bold">{_escape_xml(title)}</text>')
-
-    # background
     svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#1e1e1e"/>')
 
-    # transitions (draw behind nodes)
-    for (state, symbol), next_state in dfa.transitions.items():
-        x1, y1 = positions[state]
-        x2, y2 = positions[next_state]
-        if state == next_state:
-            # self-loop
-            loop_r = 28
+    R = 26.0
+    for (u, v), labels in edge_labels.items():
+        x1, y1 = positions[u]
+        x2, y2 = positions[v]
+        label_text = ','.join(sorted(set(labels)))
+        if u == v:
+            loop_r = 40
             svg.append(
-                f'<path d="M {x1} {y1-loop_r} '
-                f'c -40 -40, 40 -40, 0 0" fill="none" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)"/>'
+                f'<path d="M {x1} {y1-loop_r} c -44 -42, 44 -42, 0 0" fill="none" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})"/>'
             )
-            svg.append(
-                f'<text x="{x1}" y="{y1 - loop_r - 12}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>'
-            )
+            lw = max(30.0, len(label_text) * 7.5 + 14)
+            svg.append(f'<rect x="{x1 - lw/2:.2f}" y="{y1 - loop_r - 30:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>'
+                       )
+            svg.append(f'<text x="{x1:.2f}" y="{y1 - loop_r - 15:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
         else:
+            import math
+            dx, dy = x2 - x1, y2 - y1
+            dist = max(1e-6, math.hypot(dx, dy))
+            ux, uy = dx / dist, dy / dist
+            sx, sy = x1 + ux * R, y1 + uy * R
+            ex, ey = x2 - ux * R, y2 - uy * R
+            nx, ny = -uy, ux
+            curve_mag = (26 if (u, v) in bidir else 14)
+            curve = curve_mag * (1 if u < v else -1)
+            cx, cy = (sx + ex) / 2 + nx * curve, (sy + ey) / 2 + ny * curve
             svg.append(
-                f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
-                f'stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />'
+                f'<path d="M {sx:.2f} {sy:.2f} Q {cx:.2f} {cy:.2f} {ex:.2f} {ey:.2f}" fill="none" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})" />'
             )
-            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-            svg.append(
-                f'<rect x="{mx-12}" y="{my-18}" width="24" height="16" rx="3" ry="3" fill="#2d2d2d" stroke="#333"/>'
-            )
-            svg.append(
-                f'<text x="{mx}" y="{my-6}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>'
-            )
+            lx, ly = (sx + ex) / 2 + nx * (curve + 0), (sy + ey) / 2 + ny * (curve + 0)
+            lw = max(30.0, len(label_text) * 7.5 + 14)
+            svg.append(f'<rect x="{lx - lw/2:.2f}" y="{ly - 18:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+            svg.append(f'<text x="{lx:.2f}" y="{ly - 4:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
 
-    # nodes
     for s, (x, y) in positions.items():
         is_accept = s in accept
-        stroke = '#4a6fa5'
-        fill = '#ffffff'
-        svg.append(f'<circle cx="{x}" cy="{y}" r="25" fill="{fill}" stroke="{stroke}" stroke-width="2"/>')
+        svg.append(f'<circle cx="{x}" cy="{y}" r="26" fill="#ffffff" stroke="{stroke_color}" stroke-width="2.6" filter="url(#nodeShadow)"/>')
         if is_accept:
-            svg.append(f'<circle cx="{x}" cy="{y}" r="20" fill="none" stroke="{stroke}" stroke-width="2"/>')
-        svg.append(f'<text x="{x}" y="{y+4}" fill="#343a40" font-size="14" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
+            svg.append(f'<circle cx="{x}" cy="{y}" r="21" fill="none" stroke="{stroke_color}" stroke-width="2.6"/>')
+        svg.append(f'<text x="{x}" y="{y+5}" fill="#111827" font-size="15" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
         if s == start:
-            svg.append(
-                f'<line x1="{x-70}" y1="{y}" x2="{x-27}" y2="{y}" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />'
-            )
+            svg.append(f'<line x1="{x-72}" y1="{y}" x2="{x-29}" y2="{y}" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})" />')
+
+    svg.append('</svg>')
+    return _data_url(''.join(svg))
+
+
+def generate_nfa_svg(nfa: 'NFA', title: str = '') -> str:
+    width, height = 1000, 600
+    positions = _layout_states(sorted(list(nfa.states)), width, height)
+    start = nfa.start_state
+    accept = set(nfa.accept_states)
+
+    edge_labels: Dict[Tuple[str, str], List[str]] = {}
+    for (u, a), targets in nfa.transitions.items():
+        for v in targets:
+            edge_labels.setdefault((u, v), []).append(str(a))
+    bidir = set()
+    for (u, v) in list(edge_labels.keys()):
+        if (v, u) in edge_labels and u != v:
+            bidir.add((u, v)); bidir.add((v, u))
+
+    svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">']
+    svg.append(_arrow_marker_defs())
+    if title:
+        svg.append(f'<text x="20" y="40" fill="#e0e0e0" font-size="22" font-family="Arial" font-weight="bold">{_escape_xml(title)}</text>')
+    svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#1e1e1e"/>')
+
+    stroke_color = '#4a6fa5'
+    marker_id = 'arrow-blue'
+    R = 26.0
+    for (u, v), labels in edge_labels.items():
+        x1, y1 = positions[u]
+        x2, y2 = positions[v]
+        label_text = ','.join(sorted(set(labels)))
+        if u == v:
+            loop_r = 40
+            svg.append(f'<path d="M {x1} {y1-loop_r} c -44 -42, 44 -42, 0 0" fill="none" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})"/>')
+            lw = max(30.0, len(label_text) * 7.5 + 14)
+            svg.append(f'<rect x="{x1 - lw/2:.2f}" y="{y1 - loop_r - 30:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+            svg.append(f'<text x="{x1:.2f}" y="{y1 - loop_r - 15:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
+        else:
+            import math
+            dx, dy = x2 - x1, y2 - y1
+            dist = max(1e-6, math.hypot(dx, dy))
+            ux, uy = dx / dist, dy / dist
+            sx, sy = x1 + ux * R, y1 + uy * R
+            ex, ey = x2 - ux * R, y2 - uy * R
+            nx, ny = -uy, ux
+            curve_mag = (26 if (u, v) in bidir else 14)
+            curve = curve_mag * (1 if u < v else -1)
+            cx, cy = (sx + ex) / 2 + nx * curve, (sy + ey) / 2 + ny * curve
+            svg.append(f'<path d="M {sx:.2f} {sy:.2f} Q {cx:.2f} {cy:.2f} {ex:.2f} {ey:.2f}" fill="none" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})" />')
+            lx, ly = (sx + ex) / 2 + nx * (curve + 0), (sy + ey) / 2 + ny * (curve + 0)
+            lw = max(30.0, len(label_text) * 7.5 + 14)
+            svg.append(f'<rect x="{lx - lw/2:.2f}" y="{ly - 18:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+            svg.append(f'<text x="{lx:.2f}" y="{ly - 4:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
+
+    for s, (x, y) in positions.items():
+        is_accept = s in accept
+        svg.append(f'<circle cx="{x}" cy="{y}" r="26" fill="#ffffff" stroke="{stroke_color}" stroke-width="2.6" filter="url(#nodeShadow)"/>')
+        if is_accept:
+            svg.append(f'<circle cx="{x}" cy="{y}" r="21" fill="none" stroke="{stroke_color}" stroke-width="2.6"/>')
+        svg.append(f'<text x="{x}" y="{y+5}" fill="#111827" font-size="15" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
+        if s == start:
+            svg.append(f'<line x1="{x-72}" y1="{y}" x2="{x-29}" y2="{y}" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})" />')
 
     svg.append('</svg>')
     return _data_url(''.join(svg))
@@ -135,102 +224,59 @@ def generate_comparison_svg(original: DFA, minimized: DFA) -> str:
     svg_parts.append('<text x="200" y="40" fill="#e0e0e0" font-size="22" font-family="Arial" font-weight="bold">Original DFA</text>')
     svg_parts.append('<text x="800" y="40" fill="#e0e0e0" font-size="22" font-family="Arial" font-weight="bold">Minimized DFA</text>')
 
-    # Render two separate SVGs and embed them via foreignObject or directly recompute layout with offset
-    def render_with_offset(dfa: DFA, dx: float) -> str:
+    def render_with_offset(dfa: DFA, dx: float, stroke_color: str, marker_id: str) -> str:
         positions = _layout_states(sorted(list(dfa.states)), 520, 560)
-        # offset positions
         positions = {k: (x + dx, y + 60) for k, (x, y) in positions.items()}
         start = dfa.start_state
         accept = set(dfa.accept_states)
         parts: List[str] = []
         parts.append(_arrow_marker_defs())
-        # transitions
-        for (state, symbol), next_state in dfa.transitions.items():
-            x1, y1 = positions[state]
-            x2, y2 = positions[next_state]
-            if state == next_state:
-                loop_r = 28
-                parts.append(
-                    f'<path d="M {x1} {y1-loop_r} c -40 -40, 40 -40, 0 0" fill="none" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)"/>'
-                )
-                parts.append(
-                    f'<text x="{x1}" y="{y1 - loop_r - 12}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>'
-                )
+        edge_labels = _group_edge_labels(dfa.transitions)
+        bidir = set()
+        for (u, v) in list(edge_labels.keys()):
+            if (v, u) in edge_labels and u != v:
+                bidir.add((u, v)); bidir.add((v, u))
+        R = 26.0
+        for (u, v), labels in edge_labels.items():
+            x1, y1 = positions[u]
+            x2, y2 = positions[v]
+            label_text = ','.join(sorted(set(labels)))
+            if u == v:
+                loop_r = 40
+                parts.append(f'<path d="M {x1} {y1-loop_r} c -44 -42, 44 -42, 0 0" fill="none" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})"/>')
+                lw = max(30.0, len(label_text) * 7.5 + 14)
+                parts.append(f'<rect x="{x1 - lw/2:.2f}" y="{y1 - loop_r - 30:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+                parts.append(f'<text x="{x1:.2f}" y="{y1 - loop_r - 15:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
             else:
-                parts.append(
-                    f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />'
-                )
-                mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-                parts.append(f'<rect x="{mx-12}" y="{my-18}" width="24" height="16" rx="3" ry="3" fill="#2d2d2d" stroke="#333"/>')
-                parts.append(f'<text x="{mx}" y="{my-6}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>')
-        # nodes
+                import math
+                dx_, dy_ = x2 - x1, y2 - y1
+                dist = max(1e-6, math.hypot(dx_, dy_))
+                ux, uy = dx_ / dist, dy_ / dist
+                sx, sy = x1 + ux * R, y1 + uy * R
+                ex, ey = x2 - ux * R, y2 - uy * R
+                nx, ny = -uy, ux
+                curve_mag = (26 if (u, v) in bidir else 14)
+                curve = curve_mag * (1 if u < v else -1)
+                cx_, cy_ = (sx + ex) / 2 + nx * curve, (sy + ey) / 2 + ny * curve
+                parts.append(f'<path d="M {sx:.2f} {sy:.2f} Q {cx_:.2f} {cy_:.2f} {ex:.2f} {ey:.2f}" fill="none" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})" />')
+                lx, ly = (sx + ex) / 2 + nx * (curve + 0), (sy + ey) / 2 + ny * (curve + 0)
+                lw = max(30.0, len(label_text) * 7.5 + 14)
+                parts.append(f'<rect x="{lx - lw/2:.2f}" y="{ly - 18:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+                parts.append(f'<text x="{lx:.2f}" y="{ly - 4:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
         for s, (x, y) in positions.items():
-            parts.append(f'<circle cx="{x}" cy="{y}" r="25" fill="#ffffff" stroke="#4a6fa5" stroke-width="2"/>')
+            parts.append(f'<circle cx="{x}" cy="{y}" r="26" fill="#ffffff" stroke="{stroke_color}" stroke-width="2.6" filter="url(#nodeShadow)"/>')
             if s in accept:
-                parts.append(f'<circle cx="{x}" cy="{y}" r="20" fill="none" stroke="#4a6fa5" stroke-width="2"/>')
-            parts.append(f'<text x="{x}" y="{y+4}" fill="#343a40" font-size="14" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
+                parts.append(f'<circle cx="{x}" cy="{y}" r="21" fill="none" stroke="{stroke_color}" stroke-width="2.6"/>')
+            parts.append(f'<text x="{x}" y="{y+5}" fill="#111827" font-size="15" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
             if s == start:
-                parts.append(f'<line x1="{x-70}" y1="{y}" x2="{x-27}" y2="{y}" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />')
+                parts.append(f'<line x1="{x-72}" y1="{y}" x2="{x-29}" y2="{y}" stroke="{stroke_color}" stroke-width="2.6" marker-end="url(#{marker_id})" />')
         return ''.join(parts)
 
-    svg_parts.append(render_with_offset(original, 200))
-    svg_parts.append(render_with_offset(minimized, 700))
-
+    svg_parts.append(_arrow_marker_defs())
+    svg_parts.append(render_with_offset(original, 200, '#4a6fa5', 'arrow-blue'))
+    svg_parts.append(render_with_offset(minimized, 700, '#10b981', 'arrow-green'))
     svg_parts.append('</svg>')
     return _data_url(''.join(svg_parts))
-
-
-def generate_nfa_svg(nfa: 'NFA', title: str = '') -> str:
-    width, height = 1000, 600
-    positions = _layout_states(sorted(list(nfa.states)), width, height)
-    start = nfa.start_state
-    accept = set(nfa.accept_states)
-
-    svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">']
-    svg.append(_arrow_marker_defs())
-
-    if title:
-        svg.append(f'<text x="20" y="40" fill="#e0e0e0" font-size="22" font-family="Arial" font-weight="bold">{_escape_xml(title)}</text>')
-
-    svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#1e1e1e"/>')
-
-    # Draw all transitions (can be multiple targets)
-    for (state, symbol), targets in nfa.transitions.items():
-        for next_state in targets:
-            x1, y1 = positions[state]
-            x2, y2 = positions[next_state]
-            if state == next_state:
-                loop_r = 28
-                svg.append(
-                    f'<path d="M {x1} {y1-loop_r} c -40 -40, 40 -40, 0 0" fill="none" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)"/>'
-                )
-                svg.append(
-                    f'<text x="{x1}" y="{y1 - loop_r - 12}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>'
-                )
-            else:
-                svg.append(
-                    f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />'
-                )
-                mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-                svg.append(
-                    f'<rect x="{mx-12}" y="{my-18}" width="24" height="16" rx="3" ry="3" fill="#2d2d2d" stroke="#333"/>'
-                )
-                svg.append(
-                    f'<text x="{mx}" y="{my-6}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>'
-                )
-
-    # Nodes
-    for s, (x, y) in positions.items():
-        is_accept = s in accept
-        svg.append(f'<circle cx="{x}" cy="{y}" r="25" fill="#ffffff" stroke="#4a6fa5" stroke-width="2"/>')
-        if is_accept:
-            svg.append(f'<circle cx="{x}" cy="{y}" r="20" fill="none" stroke="#4a6fa5" stroke-width="2"/>')
-        svg.append(f'<text x="{x}" y="{y+4}" fill="#343a40" font-size="14" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
-        if s == start:
-            svg.append(f'<line x1="{x-70}" y1="{y}" x2="{x-27}" y2="{y}" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />')
-
-    svg.append('</svg>')
-    return _data_url(''.join(svg))
 
 
 def generate_path_svg(dfa: DFA, input_string: str, trace: List[str]) -> str:
@@ -243,49 +289,58 @@ def generate_path_svg(dfa: DFA, input_string: str, trace: List[str]) -> str:
     svg.append(_arrow_marker_defs())
     svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#1e1e1e"/>')
 
-    # Highlight transitions on path in red
     path_edges = set()
     for i, sym in enumerate(input_string):
         u, v = trace[i], trace[i+1]
         path_edges.add((u, sym, v))
 
-    # transitions
-    for (state, symbol), next_state in dfa.transitions.items():
-        x1, y1 = positions[state]
-        x2, y2 = positions[next_state]
-        on_path = (state, symbol, next_state) in path_edges
-        color = '#ff0000' if on_path else '#4a6fa5'
-        marker = 'url(#arrow-red)' if on_path else 'url(#arrow)'
-        if state == next_state:
-            loop_r = 28
-            svg.append(
-                f'<path d="M {x1} {y1-loop_r} c -40 -40, 40 -40, 0 0" fill="none" stroke="{color}" stroke-width="2.5" marker-end="{marker}"/>'
-            )
-            svg.append(
-                f'<text x="{x1}" y="{y1 - loop_r - 12}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>'
-            )
-        else:
-            svg.append(
-                f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="2.5" marker-end="{marker}" />'
-            )
-            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-            svg.append(f'<rect x="{mx-12}" y="{my-18}" width="24" height="16" rx="3" ry="3" fill="#2d2d2d" stroke="#333"/>')
-            svg.append(f'<text x="{mx}" y="{my-6}" fill="#e0e0e0" font-size="12" text-anchor="middle" font-family="Arial">{_escape_xml(str(symbol))}</text>')
+    # Build grouped labels for normal rendering
+    edge_labels = _group_edge_labels(dfa.transitions)
+    bidir = set()
+    for (u, v) in list(edge_labels.keys()):
+        if (v, u) in edge_labels and u != v:
+            bidir.add((u, v)); bidir.add((v, u))
 
-    # nodes
+    R = 26.0
+    for (u, v), labels in edge_labels.items():
+        x1, y1 = positions[u]
+        x2, y2 = positions[v]
+        label_text = ','.join(sorted(set(labels)))
+        on_path = any((u, a, v) in path_edges for a in labels)
+        color = '#ff0000' if on_path else '#4a6fa5'
+        marker = 'url(#arrow-red)' if on_path else 'url(#arrow-blue)'
+        if u == v:
+            loop_r = 40
+            svg.append(f'<path d="M {x1} {y1-loop_r} c -44 -42, 44 -42, 0 0" fill="none" stroke="{color}" stroke-width="2.6" marker-end="{marker}"/>')
+            lw = max(30.0, len(label_text) * 7.5 + 14)
+            svg.append(f'<rect x="{x1 - lw/2:.2f}" y="{y1 - loop_r - 30:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+            svg.append(f'<text x="{x1:.2f}" y="{y1 - loop_r - 15:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
+        else:
+            import math
+            dx, dy = x2 - x1, y2 - y1
+            dist = max(1e-6, math.hypot(dx, dy))
+            ux, uy = dx / dist, dy / dist
+            sx, sy = x1 + ux * R, y1 + uy * R
+            ex, ey = x2 - ux * R, y2 - uy * R
+            nx, ny = -uy, ux
+            curve_mag = (26 if (u, v) in bidir else 14)
+            curve = curve_mag * (1 if u < v else -1)
+            cx, cy = (sx + ex) / 2 + nx * curve, (sy + ey) / 2 + ny * curve
+            svg.append(f'<path d="M {sx:.2f} {sy:.2f} Q {cx:.2f} {cy:.2f} {ex:.2f} {ey:.2f}" fill="none" stroke="{color}" stroke-width="2.6" marker-end="{marker}" />')
+            lx, ly = (sx + ex) / 2 + nx * (curve + 0), (sy + ey) / 2 + ny * (curve + 0)
+            lw = max(30.0, len(label_text) * 7.5 + 14)
+            svg.append(f'<rect x="{lx - lw/2:.2f}" y="{ly - 18:.2f}" width="{lw:.2f}" height="20" rx="7" ry="7" fill="#2d2d2d" stroke="#444" filter="url(#labelShadow)"/>')
+            svg.append(f'<text x="{lx:.2f}" y="{ly - 4:.2f}" fill="#e5e7eb" font-size="13" text-anchor="middle" font-family="Arial">{_escape_xml(label_text)}</text>')
+
     for s, (x, y) in positions.items():
         is_accept = s in accept
-        is_on_path = s in trace
-        fill = '#ffffff'
         stroke = '#4a6fa5'
-        if is_on_path:
-            fill = '#cde8ff'
-        svg.append(f'<circle cx="{x}" cy="{y}" r="25" fill="{fill}" stroke="{stroke}" stroke-width="2"/>')
+        svg.append(f'<circle cx="{x}" cy="{y}" r="26" fill="#ffffff" stroke="{stroke}" stroke-width="2.6" filter="url(#nodeShadow)"/>')
         if is_accept:
-            svg.append(f'<circle cx="{x}" cy="{y}" r="20" fill="none" stroke="{stroke}" stroke-width="2"/>')
-        svg.append(f'<text x="{x}" y="{y+4}" fill="#343a40" font-size="14" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
+            svg.append(f'<circle cx="{x}" cy="{y}" r="21" fill="none" stroke="{stroke}" stroke-width="2.6"/>')
+        svg.append(f'<text x="{x}" y="{y+5}" fill="#111827" font-size="15" text-anchor="middle" font-family="Arial" font-weight="bold">{_escape_xml(str(s))}</text>')
         if s == start:
-            svg.append(f'<line x1="{x-70}" y1="{y}" x2="{x-27}" y2="{y}" stroke="#4a6fa5" stroke-width="2" marker-end="url(#arrow)" />')
+            svg.append(f'<line x1="{x-72}" y1="{y}" x2="{x-29}" y2="{y}" stroke="#4a6fa5" stroke-width="2.6" marker-end="url(#arrow-blue)" />')
 
     svg.append('</svg>')
     return _data_url(''.join(svg))
@@ -366,7 +421,6 @@ class AppHandler(BaseHTTPRequestHandler):
 
         if path == '/convert_nfa':
             try:
-                from nfa import NFA  # local import to avoid circulars in type hints
                 nfa = NFA.from_dict(data)
                 dfa = nfa.to_dfa()
                 nfa_image = generate_nfa_svg(nfa, 'Original NFA')
@@ -391,9 +445,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
         if path == '/dfa_to_regex':
             try:
-                payload = data
-                if 'dfa' in data:
-                    payload = data['dfa']
+                payload = data['dfa'] if 'dfa' in data else data
                 dfa = DFA.from_dict(payload)
                 result = dfa_to_regex_arden(dfa)
                 self._send(200, json.dumps({'success': True, **result}).encode('utf-8'), 'application/json')
@@ -426,21 +478,11 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 def run_server():
-    # Bind to all available network interfaces
-    addr = ("0.0.0.0", 5000)
-
-    try:
-        httpd = HTTPServer(addr, AppHandler)
-        print(f"Serving on http://{addr[0]}:{addr[1]}")
-        httpd.serve_forever()
-    except OSError as e:
-        print(f"Port {addr[1]} is busy, trying another port...")
-        # fallback to a different port
-        fallback_addr = ("0.0.0.0", 8501)
-        httpd = HTTPServer(fallback_addr, AppHandler)
-        print(f"Serving on http://{fallback_addr[0]}:{fallback_addr[1]}")
-        httpd.serve_forever()
-
+    port = int(os.environ.get('PORT', '5000'))
+    addr = ('0.0.0.0', port)
+    httpd = HTTPServer(addr, AppHandler)
+    print(f'Serving on http://{addr[0]}:{addr[1]}')
+    httpd.serve_forever()
 
 
 if __name__ == '__main__':
