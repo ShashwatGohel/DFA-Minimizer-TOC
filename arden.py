@@ -1,98 +1,105 @@
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple, List
+
+from dfa import DFA
 from regex_utils import re_union, re_concat, re_star, EMPTY, EPS
 
 
-def dfa_to_regex_arden(states: List[str],
-                       start_state: str,
-                       accept_states: List[str],
-                       transitions: Dict[Tuple[str, str], str]):
-    """
-    Convert DFA/NFA to regex using Arden’s Theorem.
-    - states: list of state names
-    - start_state: the start state
-    - accept_states: list of accepting states
-    - transitions: dict mapping (state, symbol) -> target_state
-    """
+def dfa_to_regex_arden(dfa: DFA) -> Dict:
+    # Work on a trimmed DFA to avoid unreachable states affecting equations
+    trimmed = dfa.remove_unreachable_states()
 
-    # Sort states deterministically
-    states = sorted(states)
+    # Order states deterministically
+    states = sorted(list(trimmed.states))
 
-    # Coefficients R(i,j) and constants C(i)
+    # Build coefficients R_{i,j} and constants C_i
     R: Dict[Tuple[str, str], str] = {}
     C: Dict[str, str] = {}
 
-    # Initialize constants: ε if accepting, else ∅
+    # Initialize C_i (epsilon if accepting, else empty)
     for s in states:
-        C[s] = EPS if s in accept_states else EMPTY
+        C[s] = EPS if s in trimmed.accept_states else EMPTY
 
-    # Build transition regexes
+    # For each pair, collect union of symbols causing transition i -a-> j
     symbols_to_targets: Dict[Tuple[str, str], List[str]] = {}
-    for (s, a), t in transitions.items():
+    for (s, a), t in trimmed.transitions.items():
         key = (s, t)
         symbols_to_targets.setdefault(key, []).append(a)
 
     for (i_state, j_state), syms in symbols_to_targets.items():
         syms_sorted = sorted(set(str(x) for x in syms))
-        coeff = "|".join(syms_sorted) if len(syms_sorted) > 1 else syms_sorted[0]
+        coeff = '|'.join(syms_sorted) if len(syms_sorted) > 1 else syms_sorted[0]
         R[(i_state, j_state)] = coeff
 
-    # Elimination order: all except start
-    order = [s for s in states if s != start_state]
+    # Elimination order: eliminate all except start_state, from the end
+    order = [s for s in states if s != trimmed.start_state]
 
     steps: List[Dict] = []
 
-    # Eliminate states in reverse order
     for k in order[::-1]:
         Rkk = R.get((k, k), EMPTY)
         star = re_star(Rkk)
         Ck = C.get(k, EMPTY)
-
         step = {
-            "eliminate": k,
-            "Rkk": Rkk,
-            "Rkk*": star,
-            "equations_before": (dict(R), dict(C))
+            'eliminate': k,
+            'Rkk': Rkk,
+            'Rkk_star': star,
+            'updates': {
+                'constants': [],
+                'coefficients': []
+            }
         }
-
         new_R: Dict[Tuple[str, str], str] = {}
         new_C: Dict[str, str] = {}
-
         for i in states:
             if i == k:
                 continue
             Rik = R.get((i, k), EMPTY)
-            # update constant part
+            # constants: C[i] := C[i] | Rik Rkk* Ck
+            const_before = C.get(i, EMPTY)
             const_term = re_concat(re_concat(Rik, star), Ck)
-            new_C[i] = re_union([C.get(i, EMPTY), const_term])
+            const_after = re_union([const_before, const_term])
+            new_C[i] = const_after
+            step['updates']['constants'].append({
+                'i': i,
+                'before': const_before,
+                'term': (f"R[{i},{k}] {star} {Ck}" if Rik != EMPTY and Ck != EMPTY else EMPTY),
+                'after': const_after
+            })
             for j in states:
                 if j == k:
                     continue
                 Rij = R.get((i, j), EMPTY)
                 Rkj = R.get((k, j), EMPTY)
                 through_k = re_concat(re_concat(Rik, star), Rkj)
-                new_R[(i, j)] = re_union([Rij, through_k])
-
-        # remove eliminated state entries
+                after = re_union([Rij, through_k])
+                new_R[(i, j)] = after
+                step['updates']['coefficients'].append({
+                    'i': i,
+                    'j': j,
+                    'before': Rij,
+                    'term': (f"R[{i},{k}] {star} R[{k},{j}]" if Rik != EMPTY and Rkj != EMPTY else EMPTY),
+                    'after': after
+                })
+        # Remove any coefficients involving k
         for (i, j) in list(R.keys()):
             if i == k or j == k:
                 del R[(i, j)]
-        for i in list(C.keys()):
-            if i == k:
-                del C[i]
-
-        R.update({(i, j): v for (i, j), v in new_R.items() if v != EMPTY})
+        # Add updated coefficients, skipping empties
+        for (i, j), v in new_R.items():
+            if v != EMPTY:
+                R[(i, j)] = v
+        # Remove C[k] and update others
+        if k in C:
+            del C[k]
         C.update(new_C)
-
-        step["equations_after"] = (dict(R), dict(C))
         steps.append(step)
 
-    # Final regex for start state
-    s0 = start_state
+    s0 = trimmed.start_state
     R00 = R.get((s0, s0), EMPTY)
     regex = re_concat(re_star(R00), C.get(s0, EMPTY))
 
     return {
-        "regex": regex,
-        "steps": steps,
-        "start_state": s0,
+        'regex': regex,
+        'steps': steps,
+        'start_state': s0,
     }
