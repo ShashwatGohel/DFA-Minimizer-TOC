@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
         generateTransitionsTable();
     });
     
+
     // Handle form submission
     document.getElementById('dfa-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -118,7 +119,9 @@ document.addEventListener('DOMContentLoaded', function() {
             tbody.appendChild(tr);
         }
     }
-    
+
+
+
     function minimizeDFA() {
         // Get DFA data from form
         const states = statesInput.value.split(',').map(s => s.trim()).filter(s => s);
@@ -334,12 +337,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayNFAConversion(data) {
         window.convertedDFA = data.dfa;
         window.minimizedDFA = data.dfa; // allow immediate testing
-        document.getElementById('string-test-section').style.display = 'block';
+        document.getElementById('string-test-section').classList.remove('is-hidden');
 
         resultsDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> NFA → DFA Conversion</h4>
-                <button class="btn btn-success" onclick='sendDFAForMinimization(window.convertedDFA)'>
+                <button class="btn btn-success" id="minimize-converted-btn">
                     <i class="fas fa-compress-arrows-alt"></i> Minimize Converted DFA
                 </button>
             </div>
@@ -405,6 +408,14 @@ document.addEventListener('DOMContentLoaded', function() {
             computeBtn.addEventListener('click', () => {
                 const dfa = data.dfa;
                 requestDFARegex(dfa);
+            });
+        }
+        const minimizeBtnEl = document.getElementById('minimize-converted-btn');
+        if (minimizeBtnEl) {
+            minimizeBtnEl.addEventListener('click', () => {
+                if (window.convertedDFA) {
+                    sendDFAForMinimization(window.convertedDFA);
+                }
             });
         }
 
@@ -557,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Show the string testing section
-        document.getElementById('string-test-section').style.display = 'block';
+        document.getElementById('string-test-section').classList.remove('is-hidden');
 
         // Scroll to results
         document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
@@ -587,11 +598,42 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderRegexResult(data) {
         const container = document.getElementById('regex-result');
         if (!container) return;
+        const stepsHTML = (data.steps || []).map((s, idx) => {
+            const consts = (s.updates?.constants || []).map(c => `
+                <tr>
+                  <td><code>C[${c.i}]</code></td>
+                  <td><code>${c.before}</code></td>
+                  <td><code>${c.term}</code></td>
+                  <td><code>${c.after}</code></td>
+                </tr>`).join('');
+            const coeffs = (s.updates?.coefficients || []).map(c => `
+                <tr>
+                  <td><code>R[${c.i},${c.j}]</code></td>
+                  <td><code>${c.before}</code></td>
+                  <td><code>${c.term}</code></td>
+                  <td><code>${c.after}</code></td>
+                </tr>`).join('');
+            return `
+            <div class="algorithm-panel">
+              <h5><i class="fas fa-step-forward"></i> Eliminate state <strong>${s.eliminate}</strong> (R[${s.eliminate},${s.eliminate}] = <code>${s.Rkk}</code>, ( ... )* = <code>${s.Rkk_star}</code>)</h5>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                  <thead><tr><th>Equation</th><th>Before</th><th>Added term</th><th>After</th></tr></thead>
+                  <tbody>${consts}${coeffs}</tbody>
+                </table>
+              </div>
+            </div>`;
+        }).join('');
+
         container.innerHTML = `
             <div class="card">
                 <div class="card-header"><h5 class="mb-0"><i class="fas fa-spell-check"></i> Regular Expression</h5></div>
                 <div class="card-body">
                     <div class="alert alert-info"><strong>Regex:</strong> <code>${data.regex}</code></div>
+                    <div class="mt-3">
+                        <h6><i class="fas fa-list"></i> Arden's Theorem Steps</h6>
+                        ${stepsHTML || '<p class="text-muted">Steps unavailable.</p>'}
+                    </div>
                 </div>
             </div>
         `;
@@ -610,6 +652,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.removeChild(link);
     }
 
+    // Expose selected functions globally for buttons created via HTML
+    window.sendDFAForMinimization = sendDFAForMinimization;
+    window.downloadImage = downloadImage;
+    window.downloadAllImages = downloadAllImages;
+
     // Function to download all images
     function downloadAllImages(originalImage, minimizedImage, comparisonImage) {
         // Add a small delay between downloads to avoid issues
@@ -625,10 +672,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Show a notification
         const notification = document.createElement('div');
-        notification.className = 'alert alert-success alert-dismissible fade show position-fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.zIndex = '9999';
+        notification.className = 'alert alert-success alert-dismissible fade show fixed-toast toast-top-right';
+        
+        
+        
         notification.innerHTML = `
             <i class="fas fa-check-circle"></i> Downloading all DFA images...
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -910,11 +957,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
-        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-        notification.style.top = '20px';
-        notification.style.left = '20px';
-        notification.style.zIndex = '9999';
-        notification.style.minWidth = '200px';
+        notification.className = `alert alert-${type} alert-dismissible fade show fixed-toast toast-top-left`;
+        
+        
+        
+        
         notification.innerHTML = `
             <i class="fas fa-${type === 'info' ? 'info-circle' : 'check-circle'}"></i> ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -1357,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', function() {
         drawingMode = 'state';
         addStateBtn.classList.add('active');
         addTransitionBtn.classList.remove('active');
-        transitionPropertiesDiv.style.display = 'none';
+        transitionPropertiesDiv.classList.add('is-hidden');
         
         // Reset transition start if any
         if (transitionStart) {
@@ -1371,7 +1418,7 @@ document.addEventListener('DOMContentLoaded', function() {
         drawingMode = 'transition';
         addTransitionBtn.classList.add('active');
         addStateBtn.classList.remove('active');
-        transitionPropertiesDiv.style.display = 'block';
+        transitionPropertiesDiv.classList.remove('is-hidden');
     });
     
     isStartStateCheckbox.addEventListener('change', function() {
