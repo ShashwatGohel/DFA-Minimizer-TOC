@@ -13,11 +13,13 @@ def is_eps(r: str) -> bool:
 
 
 def as_group(r: str) -> str:
-    # If r contains a top-level union or is a single symbol, decide parentheses
     if r in (EMPTY, EPS):
         return r
-    # Add parens if union present or already parenthesized/combined
-    if '|' in r or r.startswith('{') or (r.startswith('(') and r.endswith(')')):
+    # Avoid double-wrapping when already parenthesized
+    if r.startswith('(') and r.endswith(')'):
+        return r
+    # Wrap unions to preserve precedence in concatenation/closure
+    if '|' in r:
         return f"({r})"
     return r
 
@@ -27,7 +29,7 @@ def re_union(parts: List[str]) -> str:
     clean = [p for p in parts if not is_empty(p)]
     if not clean:
         return EMPTY
-    # Deduplicate
+    # Deduplicate while preserving order, then sort for determinism
     seen = []
     for p in clean:
         if p not in seen:
