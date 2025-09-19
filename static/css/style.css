@@ -973,3 +973,12 @@ body {
         padding: 0.6rem 1.2rem;
     }
 }
+
+/* Utility classes extracted from inline styles */
+.input-group-narrow { max-width: 420px; }
+.is-hidden { display: none; }
+.viz-3d { height: 300px; width: 100%; }
+.fixed-toast { position: fixed; z-index: 9999; min-width: 200px; }
+.toast-top-right { top: 20px; right: 20px; }
+.toast-top-left { top: 20px; left: 20px; }
+
